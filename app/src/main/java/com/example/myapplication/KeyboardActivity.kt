@@ -19,10 +19,12 @@ class KeyboardActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_keyboard)
+        helper.setMarginFixStrategy(1)
         helper.startSmartEscrow(appcompat_edit_text, ll, btn_toggle, recycler_view)
-        helper.onEmojiPanelObserver {
-            btn_toggle.text = if (it) "切换至键盘" else "切换至表情"
+        helper.setOnKeyboardObserver { _, switchOpen, _ ->
+            btn_toggle.text = if (switchOpen) "切换至键盘" else "切换至面板"
         }
+
         class MyViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
 
         recycler_view.layoutManager = SmoothPositionLinearLayoutManager(this).also {
