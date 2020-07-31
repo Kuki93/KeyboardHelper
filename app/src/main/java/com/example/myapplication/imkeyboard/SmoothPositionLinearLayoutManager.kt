@@ -1,7 +1,6 @@
 package com.example.myapplication.imkeyboard
 
 import android.content.Context
-import android.graphics.PointF
 import android.util.AttributeSet
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.LinearSmoothScroller
@@ -29,18 +28,16 @@ class SmoothPositionLinearLayoutManager : LinearLayoutManager {
         state: RecyclerView.State,
         position: Int
     ) {
-        val topSnappedSmoothScroller =
-            TopSnappedSmoothScroller(recyclerView.context)
+        val topSnappedSmoothScroller = TopSnappedSmoothScroller(recyclerView.context)
         topSnappedSmoothScroller.targetPosition = position
         startSmoothScroll(topSnappedSmoothScroller)
     }
 
     internal inner class TopSnappedSmoothScroller(context: Context?) :
         LinearSmoothScroller(context) {
-        override fun computeScrollVectorForPosition(targetPosition: Int): PointF? {
-            return this@SmoothPositionLinearLayoutManager.computeScrollVectorForPosition(
-                targetPosition
-            )
+
+        override fun calculateTimeForDeceleration(dx: Int): Int {
+            return 100
         }
 
         override fun getVerticalSnapPreference(): Int {

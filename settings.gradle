@@ -1,2 +1,3 @@
+include ':mediabox',':library'
 rootProject.name='My Application'
 include ':app'

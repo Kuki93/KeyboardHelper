@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme.TranslucentStatus" parent="AppTheme.NoActionBar">
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="AppTheme.PreviewMedia" parent="AppTheme.NoActionBar">
+        <!--下列两行控制使得应用窗口透明，用于展示一些差异-->
+        <!--        <item name="android:windowBackground">@android:color/transparent</item>-->
+        <item name="android:windowSharedElementEnterTransition">@transition/lagre_media_transition</item>
+        <item name="android:windowSharedElementExitTransition">@transition/lagre_media_transition</item>
+    </style>
+</resources>

@@ -12,6 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="56dp"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_keyboard_type="toggle"
         app:navigationIcon="@drawable/ic_action_back"
         app:title="我是微信" />
 
@@ -19,16 +20,21 @@
         android:id="@+id/recycler_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:background="@color/colorPrimary"
         app:layout_constraintBottom_toTopOf="@+id/appcompat_edit_text"
-        app:layout_constraintTop_toBottomOf="@+id/toolbar" />
+        app:layout_constraintTop_toBottomOf="@+id/toolbar"
+        app:layout_keyboard_type="content" />
+
 
     <androidx.appcompat.widget.AppCompatEditText
         android:id="@+id/appcompat_edit_text"
         android:layout_width="0dp"
         android:layout_height="60dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:background="@android:color/holo_red_dark"
+        app:layout_constraintBottom_toTopOf="@+id/ll"
         app:layout_constraintEnd_toStartOf="@+id/btn_toggle"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_keyboard_type="input" />
 
     <Button
         android:id="@+id/btn_toggle"
@@ -38,13 +44,16 @@
         app:layout_constraintBottom_toBottomOf="@+id/appcompat_edit_text"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/appcompat_edit_text"
-        app:layout_constraintTop_toTopOf="@+id/appcompat_edit_text" />
+        app:layout_constraintTop_toTopOf="@+id/appcompat_edit_text"
+        app:layout_keyboard_type="toggle" />
 
     <TextView
         android:id="@+id/ll"
         android:layout_width="match_parent"
         android:layout_height="300dp"
+        android:background="@color/colorPrimaryDark"
         android:gravity="center"
         android:text="我是天才"
-        app:layout_constraintTop_toBottomOf="@+id/appcompat_edit_text" />
+        app:layout_constraintTop_toBottomOf="parent"
+        app:layout_keyboard_type="panel" />
 </androidx.constraintlayout.widget.ConstraintLayout>

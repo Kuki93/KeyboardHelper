@@ -1,333 +1,310 @@
 package com.example.myapplication.imkeyboard
 
-import android.R
-import android.animation.ValueAnimator
 import android.app.Activity
-import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Point
-import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.util.Log
 import android.view.*
-import android.view.inputmethod.InputMethodManager
 import android.widget.PopupWindow
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.animation.doOnEnd
-import androidx.core.view.marginBottom
+import android.widget.Space
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.OnLifecycleEvent
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import kotlin.math.abs
-
-
-private const val MAX_SMOOTH_POSITION = 6
-private const val SMOOTH_POSITION = 4
-
-/**
- * 提供一个快速平滑的滚动动画
- * [position] 位置
- */
-fun RecyclerView.fixSmoothScrollToPosition(position: Int) {
-    val layoutManager = layoutManager as? LinearLayoutManager
-    layoutManager ?: kotlin.run {
-        smoothScrollToPosition(position)
-        return
-    }
-
-    val firstOffset = position.minus(layoutManager.findFirstVisibleItemPosition())
-    val lastOffset = position.minus(layoutManager.findLastVisibleItemPosition())
-
-    fun postScrollTo(offsetPosition: Int) {
-        if (abs(offsetPosition) < MAX_SMOOTH_POSITION) {
-            smoothScrollToPosition(position)
-        } else {
-            post {
-                scrollToPosition(position.minus(if (offsetPosition > 0) SMOOTH_POSITION else -SMOOTH_POSITION))
-                smoothScrollToPosition(position)
-            }
-        }
-    }
-
-    when {
-        firstOffset < 0 -> {
-            postScrollTo(firstOffset)
-        }
-        lastOffset > 0 -> {
-            postScrollTo(lastOffset)
-        }
-        else -> {
-            smoothScrollToPosition(position)
-        }
-    }
-}
-
-/**
- * 打开软键盘
- */
-fun openKeyboard(mEditText: View?, mContext: Activity) {
-    val imm =
-        mContext.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-    imm.showSoftInput(mEditText, InputMethodManager.RESULT_SHOWN)
-    imm.toggleSoftInput(
-        InputMethodManager.SHOW_FORCED,
-        InputMethodManager.HIDE_IMPLICIT_ONLY
-    )
-}
-
-/**
- * 关闭软键盘
- */
-fun closeKeyboard(mEditText: View, mContext: Activity) {
-    val imm =
-        mContext.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-    imm.hideSoftInputFromWindow(mEditText.windowToken, 0)
-}
-
 
 interface KeyboardStateObserver {
     fun onStateChanged(
-        keyboardState: Boolean,
-        switchPanelState: Boolean,
+        helper: KeyboardHelper,
+        keyboardVisible: Boolean,
+        switchPanelVisible: Boolean,
         orientation: Int
     )
+}
+
+interface TogglePreHandleListener {
+
+    /**
+     * @return true: 表示拦截处理，不再调用默认实现
+     */
+    fun onClickToggleButton(
+        helper: KeyboardHelper,
+        view: View,
+        keyboardVisible: Boolean,
+        switchPanelVisible: Boolean
+    ): Boolean
+}
+
+open class SimpleKeyboardStateObserver : KeyboardStateObserver {
+    override fun onStateChanged(
+        helper: KeyboardHelper,
+        keyboardVisible: Boolean,
+        switchPanelVisible: Boolean,
+        orientation: Int
+    ) {
+
+    }
+}
+
+open class SimpleTogglePreHandleListener : TogglePreHandleListener {
+    override fun onClickToggleButton(
+        helper: KeyboardHelper,
+        view: View,
+        keyboardVisible: Boolean,
+        switchPanelVisible: Boolean
+    ): Boolean = false
 }
 
 /**
  * 微信键盘处理
  */
-class KeyboardHelper @JvmOverloads constructor(
-    private val host: AppCompatActivity,
-    var keyboardObserver: KeyboardStateObserver? = null
-) {
+class KeyboardHelper private constructor(private val host: Activity) :
+    IKeyboardStateManger {
 
-    @JvmOverloads
-    constructor(host: AppCompatActivity, observer: ((Boolean, Boolean, Int) -> Unit)?)
-            : this(host) {
-        setOnKeyboardObserver(observer)
-    }
-
-    private lateinit var provider: KeyboardHeightProvider
-
-    private var smartEscrow = false
-
-    private lateinit var inputView: View
-
-    private lateinit var switchView: View
-
-    private var switchPanelHeight: Int = 0
-
-    private var switchPanelIsOpen = false
-
-    private var defaultMarginBottom = 0
-
-    private var lastNotifyState: Triple<Boolean, Boolean, Int>? = null
-
-    private var marginMode = 0
-
-    private var marginFixStrategy: ((Int) -> Int) = { height ->
-        if (marginMode == 0) {
-            height.plus(getInputViewMarginBottom())
-        } else {
-            height.coerceAtLeast(getInputViewMarginBottom())
+    companion object {
+        fun from(host: Activity): KeyboardHelper {
+            return KeyboardHelper(host)
         }
     }
 
-    private var viewMarginBottomFunc: (() -> Int)? = null
+    private lateinit var keyboardMonitor: KeyboardChangeMonitor
 
-    companion object {
-        private const val TAG = "KeyboardHeightProvider"
-        private const val ADJUST_ANIMATOR_DURATION = 80L
-    }
+    private lateinit var keyboardLayout: IKeyboardLayout
+
+    private lateinit var switchPanel: View
+
+    private var inputView: View? = null
+
+    private var recyclerView: RecyclerView? = null
+
+    private var automaticMode = false
+
+    private var switchPanelHeight: Int = 0
+
+    private var keyboardHeight: Int = 0
+
+    private var switchPanelIsOpen = false
+
+    private var lastNotifyState: Pair<Boolean, Boolean>? = null
+
+    private var moreKeyboardObservers: Set<KeyboardStateObserver>? = null
+
+    var keyboardObserver: KeyboardStateObserver? = null
+
+    var togglePreHandleListener: TogglePreHandleListener? = null
 
     init {
         val observer = { height: Int, orientation: Int ->
             onKeyboardHeightChanged(height, orientation)
         }
-        host.lifecycle.addObserver(object : LifecycleObserver {
+        if (host is ComponentActivity) {
+            host.lifecycle.addObserver(object : LifecycleObserver {
 
-            @OnLifecycleEvent(Lifecycle.Event.ON_CREATE)
-            fun onCreate(owner: LifecycleOwner) {
-                host.window.setSoftInputMode(
-                    WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
-                            or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
-                )
-                val parentView = host.findViewById<View>(R.id.content)
-                provider = KeyboardHeightProvider(host, parentView)
-                parentView?.post {
-                    provider.start()
+                @OnLifecycleEvent(Lifecycle.Event.ON_CREATE)
+                fun onCreate(owner: LifecycleOwner) {
+                    host.window.setSoftInputMode(
+                        WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+                                or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+                    )
+                    val parentView = host.findViewById<View>(Window.ID_ANDROID_CONTENT)
+                    keyboardMonitor = KeyboardChangeMonitor(host, parentView)
+                    keyboardMonitor.observer = observer
+                    parentView?.post {
+                        keyboardMonitor.start()
+                    }
+                }
+
+                @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
+                fun onStop(owner: LifecycleOwner) {
+                    if (owner is Activity && owner.isFinishing) {
+                        keyboardMonitor.observer = null
+                        hideAllPanel()
+                    }
+                }
+
+                @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+                fun onDestroy(owner: LifecycleOwner) {
+                    automaticMode = false
+                    keyboardMonitor.observer = null
+                    keyboardObserver = null
+                    keyboardMonitor.close()
+                }
+            })
+        }
+    }
+
+    fun startAutomaticMode(layout: IKeyboardLayout) {
+        if (automaticMode) {
+            return
+        }
+        layout.keyboardHelper = this
+        automaticMode = true
+        keyboardLayout = layout
+        inputView = keyboardLayout.providerInputView()
+        recyclerView = keyboardLayout.providerRecyclerView()
+        switchPanel = keyboardLayout.panelView
+
+        switchPanelHeight = switchPanel.height
+
+        switchPanel.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
+            switchPanelHeight = bottom.minus(top)
+        }
+
+        (host as? ComponentActivity)?.also {
+            it.onBackPressedDispatcher.addCallback(it, object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (!hideSwitchPanel()) {
+                        isEnabled = false
+                        it.onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+            })
+        }
+
+        switchPanel.markTouchNotHideFlag()
+
+        keyboardLayout.providerToggleViews()?.forEach {
+            it.markTouchNotHideFlag()
+            it.setOnClickListener { v ->
+                handlerToggleEvent(v)
+            }
+        }
+
+        recyclerView?.also {
+            it.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, oldBottom ->
+                if (oldBottom > bottom) {
+                    it.scrollToBottom()
                 }
             }
 
-            @OnLifecycleEvent(Lifecycle.Event.ON_START)
-            fun onStart(owner: LifecycleOwner) {
-                provider.setKeyboardHeightObserver(observer)
-            }
+            if (!layout.canAutoCollapse()) {
+                it.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
 
-            @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
-            fun onStop(owner: LifecycleOwner) {
-                provider.setKeyboardHeightObserver(null)
-                hideAllView()
+                    override fun onInterceptTouchEvent(rv: RecyclerView, ev: MotionEvent): Boolean {
+                        if (ev.action == MotionEvent.ACTION_DOWN) {
+                            collapseAnyPanel(it, ev)
+                        }
+                        return super.onInterceptTouchEvent(rv, ev)
+                    }
+                })
             }
+        }
+    }
 
-            @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-            fun onDestroy(owner: LifecycleOwner) {
-                smartEscrow = false
-                provider.setKeyboardHeightObserver(null)
-                provider.close()
+    fun addMoreKeyboardObservers(keyboardObserver: KeyboardStateObserver) {
+        moreKeyboardObservers?.toMutableSet()?.also {
+            it.add(keyboardObserver)
+        } ?: kotlin.run {
+            moreKeyboardObservers = hashSetOf(keyboardObserver)
+        }
+    }
+
+    fun removeMoreKeyboardObservers(keyboardObserver: KeyboardStateObserver) {
+        moreKeyboardObservers?.toMutableSet()?.also {
+            it.remove(keyboardObserver)
+        }
+    }
+
+    fun clearMoreKeyboardObservers() {
+        moreKeyboardObservers = null
+    }
+
+    fun addLambdaMoreKeyboardObservers(
+        observer: (KeyboardHelper, Boolean, Boolean, Int) -> Unit
+    ) {
+        addMoreKeyboardObservers(object : SimpleKeyboardStateObserver() {
+            override fun onStateChanged(
+                helper: KeyboardHelper,
+                keyboardVisible: Boolean,
+                switchPanelVisible: Boolean,
+                orientation: Int
+            ) {
+                observer.invoke(helper, keyboardVisible, switchPanelVisible, orientation)
             }
         })
     }
 
-    /**
-     * 一般情况下[inputView]的[bottomMargin]默认不会因其他业务需求发生变化
-     * 该方法为了满足此种情况的特殊需求
-     *
-     * [marginBottomFunc] 默认全部收起时[inputView]的[bottomMargin]，详见[getInputViewMarginBottom]
-     * [marginMode] 提供了两种兼容模式，详见默认的[KeyboardHelper.marginFixStrategy]
-     * [marginFixStrategy] 如果[marginMode]满足不了你的需求，可以自定义策略
-     */
-    @JvmOverloads
-    fun setMarginFixStrategy(
-        marginMode: Int = 0,
-        marginBottomFunc: (() -> Int)? = null,
-        marginFixStrategy: ((Int) -> Int)? = null
+    fun setLambdaKeyboardObserver(
+        observer: ((KeyboardHelper, Boolean, Boolean, Int) -> Unit)? = null
     ) {
-        if (smartEscrow) {
-            return
-        }
-        this.marginMode = marginMode
-        this.viewMarginBottomFunc = marginBottomFunc
-        marginFixStrategy?.also {
-            this.marginFixStrategy = it
-        }
-    }
-
-    /**
-     * 开启智能托管模式
-     * 该模式对布局有要求，只支持特定的布局，windowInputMode会被自动设置为adjustNothing
-     * 布局可参考[activity_keyboard]
-     *
-     * 原理是通过监听软键盘的显示和隐藏，通过动画改变[inputView]的[bottomMargin]去刷新位置
-     * [switchView]依赖[inputView]的位置
-     * [autoScrollToBottom]的高度依赖[inputView]的位置
-     *
-     * 故通过更新[inputView]的位置，完成整个视图更新
-     *
-     * [inputView] 可以被软键盘和面板顶起的view, 一般是输入框所在的布局
-     * [switchView] 切换面板view
-     * [toggleButton] 切换按钮view
-     * [autoScrollToBottom] 弹出面板或键盘自动滚动到底部，适合im
-     *
-     */
-    @JvmOverloads
-    fun startSmartEscrow(
-        inputView: View,
-        switchView: View,
-        toggleButton: View,
-        autoScrollToBottom: RecyclerView? = null
-    ) {
-        if (smartEscrow) {
-            return
-        }
-        smartEscrow = true
-        this.inputView = inputView
-        this.switchView = switchView
-        defaultMarginBottom = inputView.marginBottom
-        switchPanelHeight = switchView.height
-        switchView.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
-            switchPanelHeight = bottom.minus(top)
-        }
-        inputView.setOnKeyListener { v, keyCode, event ->
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                when (event.action) {
-                    KeyEvent.ACTION_UP -> {
-                        return@setOnKeyListener hideSwitchPanel()
-                    }
-                }
-            }
-            return@setOnKeyListener false
-        }
-
-        switchView.visibility = View.INVISIBLE
-        toggleButton.setOnClickListener {
-            checkWarning()
-            if (!switchPanelIsOpen) {
-                showSwitchPanel()
-            } else {
-                val result = showKeyboard()
-                if (!result) {
-                    Log.w(TAG, "这绝不可能")
-                }
-            }
-        }
-
-        autoScrollToBottom?.also {
-            it.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, oldBottom ->
-                if (oldBottom > bottom) {
-                    (it.layoutManager as? LinearLayoutManager)?.let { layoutManager ->
-                        if (layoutManager.reverseLayout) {
-                            0
-                        } else {
-                            layoutManager.itemCount.minus(1)
-                        }
-                    }?.also { position ->
-                        it.scrollToPosition(position)
-//                        it.fixSmoothScrollToPosition(position)
-                    }
-                }
-            }
-
-            it.setOnTouchListener { v, event ->
-                if (
-                    event.action == MotionEvent.ACTION_UP ||
-                    event.action == MotionEvent.ACTION_CANCEL
-                ) {
-                    hideAllView()
-                }
-                return@setOnTouchListener false
-            }
-        }
-    }
-
-    fun setOnKeyboardObserver(observer: ((Boolean, Boolean, Int) -> Unit)?) {
         if (observer == null) {
-            this.keyboardObserver = null
+            keyboardObserver = null
             return
         }
-        this.keyboardObserver = object : KeyboardStateObserver {
+        keyboardObserver = object : SimpleKeyboardStateObserver() {
             override fun onStateChanged(
-                keyboardState: Boolean,
-                switchPanelState: Boolean,
+                helper: KeyboardHelper,
+                keyboardVisible: Boolean,
+                switchPanelVisible: Boolean,
                 orientation: Int
             ) {
-                observer(keyboardState, switchPanelState, orientation)
+                observer.invoke(helper, keyboardVisible, switchPanelVisible, orientation)
             }
         }
     }
 
-    /**
-     * 面板是否展开
-     */
-    fun switchIsOpen(): Boolean {
+    fun setLambdaPreHandleToggleClickListener(
+        clickListener: ((KeyboardHelper, View, Boolean, Boolean) -> Boolean)? = null
+    ) {
+        if (clickListener == null) {
+            togglePreHandleListener = null
+            return
+        }
+        togglePreHandleListener = object : SimpleTogglePreHandleListener() {
+            override fun onClickToggleButton(
+                helper: KeyboardHelper,
+                view: View,
+                keyboardVisible: Boolean,
+                switchPanelVisible: Boolean
+            ): Boolean {
+                return clickListener.invoke(helper, view, keyboardVisible, switchPanelVisible)
+            }
+        }
+    }
+
+    override fun currentState(): KeyboardPanelState {
+        return if (hasAnyPanelIsOpen()) {
+            if (switchPanelIsOpen) {
+                KeyboardPanelState.KEYBOARD_PANEL_STATE_PANEL
+            } else {
+                KeyboardPanelState.KEYBOARD_PANEL_STATE_KEYBOARD
+            }
+        } else {
+            KeyboardPanelState.KEYBOARD_PANEL_STATE_NONE
+        }
+    }
+
+    override fun getKeyBoardHeight(): Int {
+        return keyboardHeight
+    }
+
+    override fun getSwitchPanelHeight(): Int {
+        return switchPanelHeight
+    }
+
+    override fun switchPanelIsOpen(): Boolean {
         return switchPanelIsOpen
     }
 
     /**
      * 软键盘是否展开
      */
-    fun keyboardIsOpen(): Boolean {
-        return provider.isShowKeyboard()
+    override fun keyboardIsOpen(): Boolean {
+        return keyboardMonitor.isShowKeyboard()
+    }
+
+    override fun lastKeyboardIsOpen(): Boolean {
+        return keyboardMonitor.lastIsShowKeyboard()
     }
 
     /**
      * 软键盘或面板是否展开
      */
-    fun hasOpenView(): Boolean {
-        return switchPanelIsOpen || provider.isShowKeyboard()
+    override fun hasAnyPanelIsOpen(): Boolean {
+        return switchPanelIsOpen || keyboardMonitor.isShowKeyboard()
     }
 
     /**
@@ -335,17 +312,16 @@ class KeyboardHelper @JvmOverloads constructor(
      *
      * @return 表示true成功，否则表示不需要展开
      */
-    fun showSwitchPanel(): Boolean {
+    override fun showSwitchPanel(): Boolean {
         if (switchPanelIsOpen) {
             return false
         }
         switchPanelIsOpen = true
-        switchView.visibility = View.VISIBLE
-        if (provider.isShowKeyboard()) {
+        if (keyboardMonitor.isShowKeyboard()) {
             // 隐藏键盘
             closeKeyboard(inputView, host)
         } else {
-            adjustInputViewPosition(switchPanelHeight)
+            adjustInputViewPosition(switchPanelHeight, ACTION_NONE_TO_PANEL)
         }
         return true
     }
@@ -355,11 +331,10 @@ class KeyboardHelper @JvmOverloads constructor(
      *
      * @return 表示true成功，否则表示不需要展开
      */
-    fun showKeyboard(): Boolean {
-        if (provider.isShowKeyboard()) {
+    override fun showKeyboard(): Boolean {
+        if (keyboardMonitor.isShowKeyboard()) {
             return false
         }
-        switchPanelIsOpen = false
         // 开启键盘
         openKeyboard(inputView, host)
         return true
@@ -370,12 +345,12 @@ class KeyboardHelper @JvmOverloads constructor(
      *
      * @return 表示true成功，否则表示不需要隐藏
      */
-    fun hideSwitchPanel(): Boolean {
+    override fun hideSwitchPanel(): Boolean {
         if (!switchPanelIsOpen) {
             return false
         }
         switchPanelIsOpen = false
-        adjustInputViewPosition(0)
+        adjustInputViewPosition(0, ACTION_PANEL_TO_NONE)
         return true
     }
 
@@ -384,8 +359,8 @@ class KeyboardHelper @JvmOverloads constructor(
      *
      * @return 表示true成功，否则表示不需要隐藏
      */
-    fun hideKeyboard(): Boolean {
-        if (!provider.isShowKeyboard()) {
+    override fun hideKeyboard(): Boolean {
+        if (!keyboardMonitor.isShowKeyboard()) {
             return false
         }
         closeKeyboard(inputView, host)
@@ -397,107 +372,176 @@ class KeyboardHelper @JvmOverloads constructor(
      *
      *  @return 表示true成功，否则表示不需要隐藏
      */
-    fun hideAllView(): Boolean {
+    override fun hideAllPanel(): Boolean {
         if (!hideKeyboard()) {
             return hideSwitchPanel()
         }
         return true
     }
 
+    override fun collapseAnyPanel(view: View?, ev: MotionEvent?): Boolean {
+        if (!hasAnyPanelIsOpen()) {
+            return false
+        }
+        fun List<View>.handler(): Boolean {
+            return all {
+                !it.hasTouchNotHideFlag()
+            }.takeIf {
+                it
+            }?.let {
+                hideAllPanel()
+            } ?: false
+        }
+        return if (view != null) {
+            if (view is ViewGroup && ev != null) {
+                view.getTouchTargetViews(ev, true, View.VISIBLE).handler()
+            } else {
+                listOf(view).handler()
+            }
+        } else {
+            hideAllPanel()
+        }
+    }
+
+    override fun currentPanelViewId(): Int? {
+        if (switchPanelIsOpen) {
+            return switchPanel.obtainPanelShowViewId()
+        }
+        return null
+    }
+
+    override fun handlerToggleEvent(v: View, ignoreOnPreHandler: Boolean) {
+        checkWarning()
+        if (!switchPanelIsOpen) {
+            if (ignoreOnPreHandler || togglePreHandleListener?.onClickToggleButton(
+                    this, v, keyboardVisible = false, switchPanelVisible = true
+                ) != true
+            ) {
+                switchPanel.markPanelShowViewIdFlag(v.id)
+                showSwitchPanel()
+            }
+        } else {
+            if (switchPanel.isCurPanelShowViewId(v)) {
+                if (ignoreOnPreHandler || togglePreHandleListener?.onClickToggleButton(
+                        this, v, keyboardVisible = true, switchPanelVisible = false
+                    ) != true
+                ) {
+                    showKeyboard()
+                }
+            } else {
+                if (ignoreOnPreHandler || togglePreHandleListener?.onClickToggleButton(
+                        this, v, keyboardVisible = false, switchPanelVisible = true
+                    ) != true
+                ) {
+                    switchPanel.markPanelShowViewIdFlag(v.id)
+                    keyboardObserver?.onStateChanged(
+                        this, keyboardVisible = false, switchPanelVisible = true,
+                        orientation = host.resources.configuration.orientation
+                    )
+                    moreKeyboardObservers?.forEach {
+                        it.onStateChanged(
+                            this, keyboardVisible = false, switchPanelVisible = true,
+                            orientation = host.resources.configuration.orientation
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     private fun onKeyboardHeightChanged(height: Int, orientation: Int) {
-        if (!smartEscrow) { // 是否开启自动托管模式
-            notifyKeyboardStateChanged(height > 0, switchPanelIsOpen, orientation)
+        if (height > 0) {
+            keyboardHeight = height
+        }
+        if (!automaticMode) { // 是否开启自动托管模式
+            notifyKeyboardStateChanged(keyboardIsOpen(), switchPanelIsOpen, orientation)
             return
         }
-        val open = height > 0
+        val open = height > 130
         if (!open && switchPanelIsOpen) { // 键盘切换至表情面板
-            adjustInputViewPosition(switchPanelHeight)
+            adjustInputViewPosition(switchPanelHeight, ACTION_KEYBOARD_TO_PANEL)
             return
+        }
+        val action = if (height > 130) {
+            if (switchPanelIsOpen) {
+                ACTION_PANEL_TO_KEYBOARD
+            } else {
+                ACTION_NONE_TO_KEYBOARD
+            }
+        } else {
+            ACTION_KEYBOARD_TO_NONE
         }
         switchPanelIsOpen = false
-        adjustInputViewPosition(height)
+        adjustInputViewPosition(height, action)
     }
 
     private fun notifyKeyboardStateChanged(
-        keyboardState: Boolean, switchPanelState: Boolean, orientation: Int
+        keyboardVisible: Boolean,
+        switchPanelVisible: Boolean,
+        orientation: Int
     ) {
         lastNotifyState?.also {
-            if (it.first == keyboardState && it.second == switchPanelState && it.third == orientation) {
+            if (it.first == keyboardVisible && it.second == switchPanelVisible) {
                 return
             }
         }
-        lastNotifyState = Triple(keyboardState, switchPanelState, orientation)
-        keyboardObserver?.onStateChanged(keyboardState, switchPanelState, orientation)
+        lastNotifyState = Pair(keyboardVisible, switchPanelVisible)
+        keyboardObserver?.onStateChanged(
+            this,
+            keyboardVisible,
+            switchPanelVisible,
+            orientation
+        )
+        moreKeyboardObservers?.forEach {
+            it.onStateChanged(
+                this,
+                keyboardVisible,
+                switchPanelVisible,
+                orientation
+            )
+        }
     }
 
     private fun checkWarning() {
         var error = false
-        if (switchPanelIsOpen && provider.isShowKeyboard()) {
+        if (switchPanelIsOpen && keyboardMonitor.isShowKeyboard()) {
             error = true
-            Log.w(TAG, "状态异常，键盘和面板同时显示，尝试修复")
         }
-        switchPanelIsOpen =
-            inputView.marginBottom > getInputViewMarginBottom() && !provider.isShowKeyboard()
-        if (error && !(switchPanelIsOpen && provider.isShowKeyboard())) {
-            Log.i(TAG, "修复成功")
-        }
+        switchPanelIsOpen = switchPanel.top < ((keyboardLayout as? View)?.height
+            ?: 0) && !keyboardMonitor.isShowKeyboard()
     }
 
-    private fun adjustInputViewPosition(height: Int) {
-
-        val fixMargin = marginFixStrategy.invoke(height)
-
-        val marginLp = inputView.layoutParams as ViewGroup.MarginLayoutParams
-        if (marginLp.bottomMargin == fixMargin) {
-            notifyKeyboardStateChanged(
-                provider.isShowKeyboard(),
-                switchPanelIsOpen,
-                host.resources.configuration.orientation
-            )
-            return
+    /**
+     *
+     * @param mode 1：表示收起面板  2: 表示显示面板  3:  键盘切换至面板 4 键盘操作
+     */
+    private fun adjustInputViewPosition(height: Int, @KeyboardChangeAction action: Int) {
+        if (!switchPanelIsOpen) {
+            switchPanel.clearPanelShowViewIdFlag()
         }
-
-        fun completeAction() {
-            marginLp.bottomMargin = fixMargin
-            inputView.requestLayout()
-            if (!switchPanelIsOpen) {
-                switchView.visibility = View.INVISIBLE
-            }
-            notifyKeyboardStateChanged(
-                provider.isShowKeyboard(),
-                switchPanelIsOpen,
-                host.resources.configuration.orientation
-            )
-        }
-
-        ValueAnimator.ofInt(marginLp.bottomMargin, fixMargin).apply {
-            duration = ADJUST_ANIMATOR_DURATION
-            addUpdateListener {
-                marginLp.bottomMargin = it.animatedValue as Int
-                inputView.requestLayout()
-            }
-            doOnEnd {
-                completeAction()
-            }
-            start()
-        }
+        notifyKeyboardStateChanged(
+            keyboardIsOpen(),
+            switchPanelIsOpen,
+            host.resources.configuration.orientation
+        )
+        keyboardLayout.startLayout(this, action)
     }
 
-    private fun getInputViewMarginBottom(): Int {
-        return viewMarginBottomFunc?.invoke() ?: defaultMarginBottom
-    }
-
-    private class KeyboardHeightProvider(
-        private val activity: AppCompatActivity,
+    private class KeyboardChangeMonitor(
+        private val activity: Activity,
         private val parentView: View
     ) : PopupWindow(activity), ViewTreeObserver.OnGlobalLayoutListener {
 
-        private val popupView: View =
-            LayoutInflater.from(activity).inflate(R.layout.test_list_item, null, false)
-        private var observer: ((Int, Int) -> Unit)? = null
-        private var keyboardLandscapeHeight = 0
-        private var keyboardPortraitHeight = 0
-        private var lastKeyboardHeight = -1
+        var observer: ((Int, Int) -> Unit)? = null
+
+        private val popupView: View = Space(activity)
+        private var lastKeyboardHeight = 0
+        private var currentKeyboardHeight = 0
+
+        private var originContentHeight = 0
+        private val screenSize = Point().also {
+            activity.windowManager.defaultDisplay.getRealSize(it)
+        }.y
 
         init {
             contentView = popupView
@@ -513,7 +557,9 @@ class KeyboardHelper @JvmOverloads constructor(
             handleOnGlobalLayout()
         }
 
-        fun isShowKeyboard() = lastKeyboardHeight > 0
+        fun isShowKeyboard() = currentKeyboardHeight > 120
+
+        fun lastIsShowKeyboard() = lastKeyboardHeight > 120
 
         fun start() {
             if (!isShowing && parentView.windowToken != null) {
@@ -528,42 +574,50 @@ class KeyboardHelper @JvmOverloads constructor(
             dismiss()
         }
 
-        fun setKeyboardHeightObserver(observer: ((Int, Int) -> Unit)?) {
-            this.observer = observer
-        }
-
         private fun handleOnGlobalLayout() {
-            val screenSize = Point()
-            activity.windowManager.defaultDisplay.getSize(screenSize)
-            val rect = Rect()
-            popupView.getWindowVisibleDisplayFrame(rect)
-            val orientation = activity.resources.configuration.orientation
-            val keyboardHeight = screenSize.y - rect.bottom
-            if (lastKeyboardHeight == keyboardHeight) {
+            val contentHeight = popupView.height
+            if (contentHeight <= 0) {
+                return // 忽略无需处理
+            }
+            val open = if (screenSize.minus(contentHeight) <= 300) {
+                originContentHeight = contentHeight
+                false
+            } else {
+                true
+            }
+            if (open && originContentHeight <= 0) {
+                throw IllegalStateException("异常状态，无法计算键盘高度")
+            }
+            val newHeight = if (open) {
+                originContentHeight.minus(contentHeight)
+            } else {
+                0
+            }
+            if (open && newHeight <= 150) {
+                throw IllegalStateException("键盘高度计算错误")
+            }
+            if (currentKeyboardHeight == newHeight) {
                 return
             }
+            lastKeyboardHeight = currentKeyboardHeight
+            currentKeyboardHeight = newHeight
+            val orientation = activity.resources.configuration.orientation
             when {
-                keyboardHeight == 0 -> {
+                newHeight < 100 -> {
+                    currentKeyboardHeight = 0
                     notifyKeyboardHeightChanged(0, orientation)
                 }
                 orientation == Configuration.ORIENTATION_PORTRAIT -> {
-                    keyboardPortraitHeight = keyboardHeight
-                    notifyKeyboardHeightChanged(keyboardPortraitHeight, orientation)
+                    notifyKeyboardHeightChanged(newHeight.coerceAtLeast(0), orientation)
                 }
                 else -> {
-                    keyboardLandscapeHeight = keyboardHeight
-                    notifyKeyboardHeightChanged(keyboardLandscapeHeight, orientation)
+                    notifyKeyboardHeightChanged(newHeight.coerceAtLeast(0), orientation)
                 }
             }
-            lastKeyboardHeight = keyboardHeight
         }
 
         private fun notifyKeyboardHeightChanged(height: Int, orientation: Int) {
-            val orientationLabel =
-                if (orientation == Configuration.ORIENTATION_PORTRAIT) "portrait" else "landscape"
-            Log.i(TAG, "onKeyboardHeightChanged in pixels: $height $orientationLabel")
             observer?.invoke(height, orientation)
         }
     }
 }
-

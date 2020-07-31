@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <attr name="layout_keyboard_type" format="enum">
+        <enum name="none" value="0" />
+        <enum name="content" value="1" />
+        <enum name="panel" value="2" />
+        <enum name="input" value="3" />
+        <enum name="toggle" value="4" />
+        <enum name="helper" value="5" />
+    </attr>
+
+    <attr name="keyboard_toggleIds" format="string" />
+
+    <attr name="keyboard_auto_collapse_keyboard" format="boolean" />
+    <attr name="keyboard_auto_collapse_above_view_top_id" format="reference" />
+
+    <attr name="layout_scroll_flag" format="enum">
+        <enum name="scroll" value="0" />
+        <enum name="fixed" value="1" />
+    </attr>
+
+    <declare-styleable name="ConstraintKeyboardLayout">
+        <attr name="keyboard_auto_mode" format="boolean" />
+        <attr name="keyboard_fixed_content" format="boolean" />
+        <attr name="keyboard_clip_content" format="boolean" />
+        <attr name="keyboard_expand_to_keyboard_constraint" format="reference" />
+        <attr name="keyboard_expand_to_panel_constraint" format="reference" />
+        <attr name="keyboard_collapse_constraint" format="reference" />
+        <attr name="keyboard_toggleIds" />
+        <attr name="keyboard_auto_collapse_keyboard" />
+        <attr name="keyboard_auto_collapse_above_view_top_id" />
+    </declare-styleable>
+
+    <declare-styleable name="ConstraintKeyboardLayout_Layout">
+        <attr name="layout_keyboard_type" />
+    </declare-styleable>
+
+    <declare-styleable name="LinearKeyboardLayout_Layout">
+        <attr name="layout_keyboard_type" />
+        <attr name="layout_scroll_flag" />
+        <attr name="layout_draw_level" format="integer" />
+    </declare-styleable>
+</resources>

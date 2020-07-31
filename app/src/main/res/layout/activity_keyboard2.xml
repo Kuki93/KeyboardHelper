@@ -1,48 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
-
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        app:navigationIcon="@drawable/ic_action_back"
-        app:title="我是微信" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_above="@+id/appcompat_edit_text"
+        android:layout_below="@+id/toolbar" />
 
-    <LinearLayout
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/colorPrimary"
+        app:navigationIcon="@drawable/ic_action_back"
+        app:title="我是微信" />
+
+    <androidx.appcompat.widget.AppCompatEditText
+        android:id="@+id/appcompat_edit_text"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_alignParentBottom="true" />
+
+    <Button
+        android:id="@+id/btn_toggle"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <androidx.appcompat.widget.AppCompatEditText
-            android:id="@+id/appcompat_edit_text"
-            android:layout_width="0dp"
-            android:layout_height="60dp"
-            android:layout_weight="1" />
-
-        <Button
-            android:id="@+id/btn_toggle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="切换" />
-    </LinearLayout>
+        android:layout_alignBottom="@+id/appcompat_edit_text"
+        android:layout_alignParentEnd="true"
+        android:text="切换" />
 
     <TextView
         android:id="@+id/ll"
         android:layout_width="match_parent"
-        android:layout_height="100dp"
+        android:layout_height="350dp"
+        android:layout_below="@+id/appcompat_edit_text"
         android:gravity="center"
-        android:text="我是天才"
-        android:visibility="gone" />
+        android:text="我是天才" />
 
-
-</LinearLayout>
+</RelativeLayout>

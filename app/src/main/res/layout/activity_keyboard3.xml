@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.example.myapplication.imkeyboard.ConstraintKeyboardLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:keyboard_auto_mode="true"
+    app:keyboard_collapse_constraint="@xml/keyboard_collapse"
+    app:keyboard_expand_to_keyboard_constraint="@xml/keyboard_expand_to_keyboard"
+    app:keyboard_expand_to_panel_constraint="@xml/keyboard_expand_to_panel"
+    tools:context=".KeyboardActivity">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:navigationIcon="@drawable/ic_action_back"
+        app:title="我是微信" />
+
+    <com.example.myapplication.imkeyboard.ClipRecyclerView
+        android:id="@+id/recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:background="@color/colorPrimary"
+        app:layout_constraintBottom_toTopOf="@+id/appcompat_edit_text"
+        app:layout_constraintTop_toBottomOf="@+id/toolbar"
+        app:layout_keyboard_type="content" />
+
+    <androidx.appcompat.widget.AppCompatEditText
+        android:id="@+id/appcompat_edit_text"
+        android:layout_width="0dp"
+        android:layout_height="60dp"
+        android:background="@android:color/holo_red_dark"
+        app:layout_constraintBottom_toTopOf="@+id/ll"
+        app:layout_constraintEnd_toStartOf="@+id/btn_toggle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_keyboard_type="input" />
+
+    <Button
+        android:id="@+id/btn_toggle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="切换"
+        app:layout_constraintBottom_toBottomOf="@+id/appcompat_edit_text"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/appcompat_edit_text"
+        app:layout_constraintTop_toTopOf="@+id/appcompat_edit_text"
+        app:layout_keyboard_type="toggle" />
+
+    <FrameLayout
+        android:id="@+id/ll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="parent"
+        app:layout_keyboard_type="panel">
+
+        <TextView
+            android:id="@+id/tv1"
+            android:layout_width="match_parent"
+            android:layout_height="400dp"
+            android:layout_gravity="center"
+            android:background="@android:color/holo_green_dark"
+            android:text="我是天才" />
+
+        <TextView
+            android:id="@+id/tv2"
+            android:layout_width="match_parent"
+            android:layout_height="350dp"
+            android:layout_gravity="center"
+            android:background="@android:color/holo_blue_dark"
+            android:text="文哥傻逼" />
+
+    </FrameLayout>
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_begin="100dp"
+        app:layout_keyboard_type="helper" />
+</com.example.myapplication.imkeyboard.ConstraintKeyboardLayout>
