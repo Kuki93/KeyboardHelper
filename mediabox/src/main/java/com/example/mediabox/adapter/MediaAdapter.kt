@@ -6,6 +6,7 @@ import android.os.Build
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.core.view.ViewCompat
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -19,7 +20,18 @@ class MediaAdapter : PagingDataAdapter<MediaData, PhotoViewHolder>(
     PhotoDiffCallback()
 ) {
 
-    var itemClickListener: ((View, MediaData) -> Unit)? = null
+    var itemClickListener: ((View, Int, MediaData) -> Unit)? = null
+
+    fun getSources(): ArrayList<MediaData> {
+        val count = itemCount
+        val sources = ArrayList<MediaData>(count)
+        repeat(count) {
+            getItem(it)?.apply {
+                sources.add(this)
+            }
+        }
+        return sources
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PhotoViewHolder {
         return PhotoViewHolder(
@@ -32,9 +44,6 @@ class MediaAdapter : PagingDataAdapter<MediaData, PhotoViewHolder>(
         (holder.itemView as ImageView).also {
             val data = getItem(position)
             data ?: return
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                it.transitionName = data.uri.path
-            }
             GlideApp.with(it)
                 .asBitmap()
                 .load(data.uri)
@@ -57,7 +66,7 @@ class MediaAdapter : PagingDataAdapter<MediaData, PhotoViewHolder>(
                     }
                 })
             it.setOnClickListener { v ->
-                itemClickListener?.invoke(v, data)
+                itemClickListener?.invoke(v, position, data)
             }
         }
     }

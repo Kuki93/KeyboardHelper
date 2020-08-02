@@ -1,19 +1,26 @@
 package com.example.mediabox.ext
 
+import android.app.Activity
+import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.drawable.Drawable
 import android.net.Uri
+import android.os.Build
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
+import androidx.exifinterface.media.ExifInterface
 import com.bumptech.glide.RequestBuilder
 import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.target.Target
+import com.bumptech.glide.request.transition.Transition
 import com.example.mediabox.data.MediaData
 import com.example.mediabox.glide.GlideApp
 import com.example.mediabox.glide.gif.FrameSequenceDrawable
@@ -38,6 +45,10 @@ interface IMediaShowListener {
     fun showMedia(bitmap: Bitmap)
 
     fun showMedia(resId: Int)
+
+    fun showMediaCache(bitmap: Bitmap) {
+        showMedia(bitmap)
+    }
 
     fun getImageView() = this as View
 
@@ -107,35 +118,26 @@ fun IMediaShowListener.showMediaWithListener(data: MediaData, doEnd: ((Boolean) 
                 .listener(listener)
                 .into(getImageView() as ImageView)
         } else {
-            val listener = doEnd?.let {
-                object : RequestListener<Drawable> {
-                    override fun onLoadFailed(
-                        e: GlideException?,
-                        model: Any?,
-                        target: Target<Drawable>?,
-                        isFirstResource: Boolean
-                    ): Boolean {
-                        it(false)
-                        return false
+            GlideApp.with(getContext())
+                .asBitmap()
+                .load(data.uri)
+                .into(object : CustomTarget<Bitmap>() {
+                    override fun onLoadCleared(placeholder: Drawable?) {
+                    }
+
+                    override fun onLoadFailed(errorDrawable: Drawable?) {
+                        super.onLoadFailed(errorDrawable)
+                        doEnd?.invoke(false)
                     }
 
                     override fun onResourceReady(
-                        resource: Drawable?,
-                        model: Any?,
-                        target: Target<Drawable>?,
-                        dataSource: DataSource?,
-                        isFirstResource: Boolean
-                    ): Boolean {
-                        it(true)
-                        return false
+                        resource: Bitmap,
+                        transition: Transition<in Bitmap>?
+                    ) {
+                        showMediaCache(resource)
+                        doEnd?.invoke(true)
                     }
-                }
-            }
-
-            GlideApp.with(getContext())
-                .load(data.uri)
-                .listener(listener)
-                .into(getImageView() as ImageView)
+                })
         }
     }
 }
@@ -156,28 +158,11 @@ fun MediaData.isLagerImage(screenSize: Point): Boolean {
     if (width <= 0 || height <= 0) {
         return true
     }
-    if (width >= screenSize.x.times(1.2f)) {
-        if (width >= screenSize.x.times(2f)) {
-            return true
-        }
-        if (width >= height.times(2.5f)) {
-            return true
-        }
-        if (height >= screenSize.y.times(1.2f)) {
-            return true
-        }
+    if (height >= screenSize.y.times(2.2f)) {
+        return true
     }
-
-    if (height >= screenSize.y) {
-        if (height >= screenSize.y.times(2f)) {
-            return true
-        }
-        if (height >= width.times(3f)) {
-            return true
-        }
-        if (width >= screenSize.x.times(1.2f)) {
-            return true
-        }
+    if (width >= screenSize.x.times(3f) && height >= screenSize.y.times(2f)) {
+        return true
     }
     return false
 }
@@ -207,7 +192,7 @@ fun LagerMediaView.initLagerState(viewSize: Point, data: MediaData) {
         setDoubleTapZoomMinScale(scaleX)
     } else {
         if (scaleX > scaleY) {
-            setScaleAndCenterWithAnim(scaleY, PointF(viewSize.x.div(2f), 0f))
+            setScaleAndCenter(scaleY, PointF(viewSize.x.div(2f), 0f))
             setDoubleTapZoomMinScale(scaleY)
         }
     }
@@ -222,6 +207,30 @@ fun LagerMediaView.setScaleAndCenterWithAnim(scale: Float, viewCenter: PointF) {
     }
 }
 
+fun MediaData.checkMediaInfo(mContentResolver: ContentResolver) {
+    val data = this
+    if (data.width <= 0 || data.height <= 0) {
+        mContentResolver.openInputStream(data.uri)?.use { input ->
+            ExifInterface(input).apply {
+                data.width = getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, -1)
+                data.height = getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, -1)
+            }
+        }
+    }
+
+    if (data.width <= 0 || data.height <= 0) {
+        mContentResolver.openFileDescriptor(data.uri, "r")?.use {
+            it.fileDescriptor?.let { fd ->
+                BitmapFactory.decodeFileDescriptor(fd)
+            }?.also { bitmap ->
+                data.width = bitmap.width
+                data.height = bitmap.height
+                bitmap.recycle()
+            }
+        }
+    }
+}
+
 fun MediaData.isJpg() = mimeType == JPG
 
 fun MediaData.isPng() = mimeType == PNG
@@ -229,3 +238,56 @@ fun MediaData.isPng() = mimeType == PNG
 fun MediaData.isWebp() = mimeType == WEBP
 
 fun MediaData.isGif() = mimeType == GIF
+
+fun hideSystemUI(activity: Activity) {
+    // Enables regular immersive mode.
+    // For "lean back" mode, remove SYSTEM_UI_FLAG_IMMERSIVE.
+    // Or for "sticky immersive," replace it with SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+    activity.window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            // Set the content to appear under the system bars so that the
+            // content doesn't resize when the system bars hide and show.
+            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            // Hide the nav bar and status bar
+            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_FULLSCREEN)
+}
+
+// Shows the system bars by removing all the flags
+// except for the ones that make the content appear under the system bars.
+fun showSystemUI(activity: Activity) {
+    activity.window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)
+}
+
+fun setStatusBarColor(activity: Activity, color: Int) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        activity.window.statusBarColor = color
+    }
+}
+
+fun setStatusBarTextColor(activity: Activity, isDark: Boolean) {
+    //6.0以上
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        val decorView = activity.window.decorView
+        var vis = decorView.systemUiVisibility
+        vis = if (isDark) {
+            vis or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        } else {
+            vis and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+        }
+        decorView.systemUiVisibility = vis
+    }
+}
+
+fun getStatusBarHeight(context: Context): Int {
+    val resourceId: Int = context.resources.getIdentifier("status_bar_height", "dimen", "android")
+    return context.resources.getDimensionPixelSize(resourceId)
+}
+
+fun getNavigationBarHeight(context: Context): Int {
+    val resourceId: Int =
+        context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
+    return context.resources.getDimensionPixelSize(resourceId)
+}

@@ -19,9 +19,9 @@
     </style>
 
     <style name="AppTheme.PreviewMedia" parent="AppTheme.NoActionBar">
-        <!--下列两行控制使得应用窗口透明，用于展示一些差异-->
-<!--        <item name="android:windowBackground">@android:color/transparent</item>-->
-
+<!--        <item name="android:windowIsTranslucent">true</item>-->
+        <item name="android:windowTranslucentNavigation">false</item>
+        <item name="android:windowTranslucentStatus">false</item>
     </style>
 
 </resources>

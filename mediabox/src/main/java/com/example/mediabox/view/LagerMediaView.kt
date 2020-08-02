@@ -11,8 +11,7 @@ import com.example.mediabox.ext.IMediaShowListener
 class LagerMediaView @JvmOverloads constructor(
     context: Context? = null,
     attrs: AttributeSet? = null
-) : SubsamplingScalePlusImageView(context, attrs),
-    IMediaShowListener {
+) : SubsamplingScalePlusImageView(context, attrs), IMediaShowListener {
 
     override fun isSupportLargeMedia() = true
 
@@ -31,5 +30,9 @@ class LagerMediaView @JvmOverloads constructor(
 
     override fun showMedia(resId: Int) {
         setImage(ImageSource.resource(resId))
+    }
+
+    override fun showMediaCache(bitmap: Bitmap) {
+        setImage(ImageSource.cachedBitmap(bitmap))
     }
 }

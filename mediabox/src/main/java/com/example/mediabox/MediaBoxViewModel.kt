@@ -1,9 +1,12 @@
 package com.example.mediabox
 
 import android.annotation.SuppressLint
+import android.content.ContentResolver
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.provider.MediaStore
 import androidx.annotation.IntDef
+import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -13,6 +16,7 @@ import androidx.paging.PagingDataAdapter
 import com.example.mediabox.data.MediaData
 import com.example.mediabox.paging.MediaRepository
 import io.reactivex.Single
+import io.reactivex.schedulers.Schedulers
 import kotlinx.coroutines.flow.Flow
 
 class MediaBoxViewModel : ViewModel() {
@@ -23,6 +27,7 @@ class MediaBoxViewModel : ViewModel() {
         const val MEDIA_PICTURE = "media/picture"
         const val MEDIA_VIDEO = "media/video"
         const val MEDIA_DATA_KEY = "media_data_key"
+        const val MEDIA_INDEX_KEY = "media_index_key"
 
         const val MEDIA_TYPE_PICTURE = 0
         const val MEDIA_TYPE_VIDEO = 1
@@ -49,9 +54,9 @@ class MediaBoxViewModel : ViewModel() {
 
     @SuppressLint("CheckResult")
     fun getMediaFlow(
-        context: Context,
-        mediaType: Int,
-        excludeGif: Boolean = true
+            context: Context,
+            mediaType: Int,
+            excludeGif: Boolean = true
     ): Flow<PagingData<MediaData>> {
         this.excludeGif = excludeGif
         mediaUri = when (mediaType) {
@@ -59,20 +64,20 @@ class MediaBoxViewModel : ViewModel() {
             MEDIA_TYPE_VIDEO -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
             else -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         }
-//        if (mediaType != MEDIA_TYPE_VIDEO) {
-//            findAllPhotoBuckets(context)
-//                .subscribeOn(Schedulers.io())
-//                .subscribe({
-//                    buckets.postValue(it)
-//                }, { buckets.postValue(defaultBuckets) })
-//        } else {
-//            buckets.postValue(defaultBuckets)
-//        }
+        if (mediaType != MEDIA_TYPE_VIDEO) {
+            findAllPhotoBuckets(context)
+                .subscribeOn(Schedulers.io())
+                .subscribe({
+                    buckets.postValue(it)
+                }, { buckets.postValue(defaultBuckets) })
+        } else {
+            buckets.postValue(defaultBuckets)
+        }
         return MediaRepository(
-            context,
-            mediaUri,
-            null,
-            excludeGif
+                context,
+                mediaUri,
+                null,
+                excludeGif
         ).let {
             repository = it
             it.mediaData
@@ -98,12 +103,12 @@ class MediaBoxViewModel : ViewModel() {
             val projection = arrayOf(MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME)
             val ret = mutableSetOf(defaultBucketName)
             val cursor = context.contentResolver?.query(
-                mediaUri, projection, null, null,
-                MediaStore.Images.Media.DATE_MODIFIED + " desc "
+                    mediaUri, projection, null, null,
+                    MediaStore.Images.Media.DATE_MODIFIED + " desc "
             )?.also {
                 while (it.moveToNext()) {
                     val bucket =
-                        it.getString(it.getColumnIndex(MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME))
+                            it.getString(it.getColumnIndex(MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME))
                     if (!bucket.isNullOrEmpty()) {
                         ret.add(bucket)
                     }

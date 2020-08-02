@@ -2,13 +2,17 @@ package com.example.myapplication.imkeyboard
 
 import android.app.Activity
 import android.content.Context
-import android.view.MotionEvent
-import android.view.View
-import android.view.ViewGroup
-import android.view.ViewStub
+import android.os.Build
+import android.transition.ArcMotion
+import android.transition.ChangeBounds
+import android.transition.TransitionSet
+import android.view.*
 import android.view.inputmethod.InputMethodManager
+import androidx.annotation.RequiresApi
+import androidx.interpolator.view.animation.LinearOutSlowInInterpolator
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.myapplication.temp.SubsamplingScaleImageViewSharedTransition
 import kotlin.math.abs
 
 private const val MAX_SMOOTH_POSITION = 6
@@ -206,4 +210,23 @@ fun ViewGroup.getTouchTargetViews(
         result.add(this)
     }
     return result
+}
+
+@RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+fun getSsharedElementReturnTransition(): TransitionSet {
+    return TransitionSet()
+        .addTransition(SubsamplingScaleImageViewSharedTransition().also {
+            it.setImageViewScaleType(1)
+            it.setSubsamplingScaleType(0)
+        })
+        .addTransition(ChangeBounds().also {
+            val arcMotion = ArcMotion()
+            arcMotion.maximumAngle = 90f
+            arcMotion.minimumVerticalAngle = 0f
+            arcMotion.minimumHorizontalAngle = 15f
+            it.pathMotion = arcMotion
+        })
+        .setInterpolator(LinearOutSlowInInterpolator())
+        .setOrdering(TransitionSet.ORDERING_TOGETHER)
+        .setDuration(350)
 }

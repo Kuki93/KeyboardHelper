@@ -1,4 +1,4 @@
-package com.example.mediabox.ext;
+package com.example.myapplication.temp;
 
 import android.animation.Animator;
 import android.animation.PropertyValuesHolder;
@@ -17,7 +17,7 @@ import androidx.annotation.RequiresApi;
 
 import com.davemorrissey.labs.subscaleview.ImageViewState;
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView;
-import com.example.mediabox.R;
+import com.example.myapplication.R;
 
 /**
  * While changing size of {@link SubsamplingScaleImageView}, change scale and center for smooth transition.
@@ -43,6 +43,7 @@ public class SubsamplingScaleImageViewSharedTransition extends Transition {
         imageViewScaleType = 0;
         direction = 0;
         subsamplingScaleType = 0;
+        addTarget(SubsamplingScaleImageView.class);
     }
 
     /**

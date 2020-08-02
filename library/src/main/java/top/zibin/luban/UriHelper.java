@@ -15,7 +15,6 @@ public class UriHelper {
     /**
      * 专为Android4.4及以上设计的从Uri获取文件绝对路径，以前的方法已不好使
      */
-    @SuppressLint("NewApi")
     public static String getPath(final Context context, final Uri uri) {
 
         final boolean isKitKat = Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT;

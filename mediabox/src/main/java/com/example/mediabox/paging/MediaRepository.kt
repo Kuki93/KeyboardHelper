@@ -14,7 +14,7 @@ class MediaRepository(
 ) {
 
     val mediaData by lazy {
-        Pager(PagingConfig(pageSize = 30)) {
+        Pager(PagingConfig(pageSize = 50, initialLoadSize = 30)) {
             MediaListDataSource(
                 context,
                 mediaUri,

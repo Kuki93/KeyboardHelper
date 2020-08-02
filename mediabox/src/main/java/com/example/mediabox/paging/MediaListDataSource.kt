@@ -4,11 +4,11 @@ import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
-import androidx.exifinterface.media.ExifInterface
 import androidx.paging.PagingSource
 import com.example.mediabox.data.MediaData
 import com.example.mediabox.ext.GIF
 import com.example.mediabox.ext.JPG
+import com.example.mediabox.ext.checkMediaInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -73,13 +73,9 @@ class MediaListDataSource(
                 val id = getLong(getColumnIndex(MediaStore.Images.Media._ID))
                 val uri = ContentUris.withAppendedId(mediaUri, id)
                 val mimeType = mContentResolver.getType(uri)?.takeIf { it.isNotEmpty() } ?: JPG
-                val data = mContentResolver.openInputStream(uri)?.let { input ->
-                    val exifInterface = ExifInterface(input)
-                    val width = exifInterface.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, -1)
-                    val height = exifInterface.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, -1)
-                    MediaData(uri, width, height, mimeType).apply { input.close() }
-                } ?: MediaData(uri, mimeType = mimeType)
-                values.add(data)
+                values.add(MediaData(uri, mimeType = mimeType).also {
+                    it.checkMediaInfo(mContentResolver)
+                })
             }
         }
         cursor?.close()

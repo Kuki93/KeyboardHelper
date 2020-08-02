@@ -15,4 +15,19 @@
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar11" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowSharedElementEnterTransition">@transition/tt</item>
+        <item name="android:windowSharedElementExitTransition">@transition/tt</item>
+<!--        <item name="android:windowSharedElementReenterTransition">@transition/tt</item>-->
+<!--        <item name="android:windowSharedElementReturnTransition">@transition/tt</item>-->
+    </style>
 </resources>

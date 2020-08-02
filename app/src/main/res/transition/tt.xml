@@ -11,7 +11,7 @@
             android:minimumVerticalAngle="0" />
     </changeBounds>
     <transition
-        class="com.example.mediabox.ext.SubsamplingScaleImageViewSharedTransition"
+        class="com.example.myapplication.temp.SubsamplingScaleImageViewSharedTransition"
         app:imageViewScaleType="centerCrop"
         app:subsamplingImageViewScaleType="fitCenter" />
 </transitionSet>
