@@ -5,11 +5,12 @@ import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.util.AttributeSet
+import android.view.MotionEvent
 import com.example.mediabox.data.ImageSource
 import com.example.mediabox.ext.IMediaShowListener
 
 class LagerMediaView @JvmOverloads constructor(
-    context: Context? = null,
+    context: Context,
     attrs: AttributeSet? = null
 ) : SubsamplingScalePlusImageView(context, attrs), IMediaShowListener {
 

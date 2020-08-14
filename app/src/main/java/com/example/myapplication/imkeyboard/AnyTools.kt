@@ -2,78 +2,81 @@ package com.example.myapplication.imkeyboard
 
 import android.app.Activity
 import android.content.Context
+import android.graphics.Rect
 import android.os.Build
+import android.os.SystemClock
 import android.transition.ArcMotion
 import android.transition.ChangeBounds
 import android.transition.TransitionSet
 import android.view.*
 import android.view.inputmethod.InputMethodManager
+import androidx.annotation.Px
 import androidx.annotation.RequiresApi
 import androidx.interpolator.view.animation.LinearOutSlowInInterpolator
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.myapplication.temp.SubsamplingScaleImageViewSharedTransition
-import kotlin.math.abs
 
 private const val MAX_SMOOTH_POSITION = 6
 private const val SMOOTH_POSITION = 4
-private const val VIEW_TAG_KEY = 2131165353
+private const val HOT_HIDE_VIEW_TAG_KEY = 2131165353
 private const val PANEL_SHOW_VIEW_TAG_KEY = 2136665353
+private const val PADDING_RECT_VIEW_TAG_KEY = 2136665853
 
 /**
  * 提供一个快速平滑的滚动动画
  * [position] 位置
  */
 fun RecyclerView.fixSmoothScrollToPosition(position: Int, post: Boolean) {
-    val layoutManager = layoutManager as? LinearLayoutManager
-    layoutManager ?: kotlin.run {
-        if (post) {
-            post {
-                smoothScrollToPosition(position)
-            }
-        } else {
-            smoothScrollToPosition(position)
-        }
-        return
-    }
-
-    val firstOffset = position.minus(layoutManager.findFirstVisibleItemPosition())
-    val lastOffset = position.minus(layoutManager.findLastVisibleItemPosition())
-
-    fun postScrollTo(offsetPosition: Int) {
-        if (abs(offsetPosition) < MAX_SMOOTH_POSITION) {
-            if (post) {
-                post {
-                    smoothScrollToPosition(position)
-                }
-            } else {
-                smoothScrollToPosition(position)
-            }
-        } else {
-            post {
-                scrollToPosition(position.minus(if (offsetPosition > 0) SMOOTH_POSITION else -SMOOTH_POSITION))
-                smoothScrollToPosition(position)
-            }
-        }
-    }
-
-    when {
-        firstOffset < 0 -> {
-            postScrollTo(firstOffset)
-        }
-        lastOffset > 0 -> {
-            postScrollTo(lastOffset)
-        }
-        else -> {
-            if (post) {
-                post {
-                    scrollToPosition(position)
-                }
-            } else {
-                scrollToPosition(position)
-            }
-        }
-    }
+//    val layoutManager = layoutManager as? LinearLayoutManager
+//    layoutManager ?: kotlin.run {
+//        if (post) {
+//            post {
+//                smoothScrollToPosition(position)
+//            }
+//        } else {
+//            smoothScrollToPosition(position)
+//        }
+//        return
+//    }
+//
+//    val firstOffset = position.minus(layoutManager.findFirstVisibleItemPosition())
+//    val lastOffset = position.minus(layoutManager.findLastVisibleItemPosition())
+//
+//    fun postScrollTo(offsetPosition: Int) {
+//        if (abs(offsetPosition) < MAX_SMOOTH_POSITION) {
+//            if (post) {
+//                post {
+//                    smoothScrollToPosition(position)
+//                }
+//            } else {
+//                smoothScrollToPosition(position)
+//            }
+//        } else {
+//            post {
+//                scrollToPosition(position.minus(if (offsetPosition > 0) SMOOTH_POSITION else -SMOOTH_POSITION))
+//                smoothScrollToPosition(position)
+//            }
+//        }
+//    }
+//
+//    when {
+//        firstOffset < 0 -> {
+//            postScrollTo(firstOffset)
+//        }
+//        lastOffset > 0 -> {
+//            postScrollTo(lastOffset)
+//        }
+//        else -> {
+//            if (post) {
+//                post {
+//                    scrollToPosition(position)
+//                }
+//            } else {
+//                scrollToPosition(position)
+//            }
+//        }
+//    }
 }
 
 @JvmOverloads
@@ -85,39 +88,80 @@ fun RecyclerView.scrollToBottom(smooth: Boolean = true, post: Boolean = false) {
             layoutManager.itemCount.minus(1)
         }
     }?.also { position ->
-        if (smooth) {
-            fixSmoothScrollToPosition(position, post)
-        } else {
-            if (post) {
-                post {
-                    scrollToPosition(position)
-                }
-            } else {
-                scrollToPosition(position)
-            }
-        }
+        scrollToPosition(position)
+//        if (smooth) {
+//            fixSmoothScrollToPosition(position, post)
+//        } else {
+//            if (post) {
+//                post {
+//                    scrollToPosition(position)
+//                }
+//            } else {
+//                scrollToPosition(position)
+//            }
+//        }
     }
 }
 
 @JvmOverloads
 fun RecyclerView.scrollToTop(smooth: Boolean = true, post: Boolean = true) {
-    (layoutManager as? LinearLayoutManager)?.let { layoutManager ->
-        if (layoutManager.reverseLayout) {
-            layoutManager.itemCount.minus(1)
-        } else {
+//    (layoutManager as? LinearLayoutManager)?.let { layoutManager ->
+//        if (layoutManager.reverseLayout) {
+//            layoutManager.itemCount.minus(1)
+//        } else {
+//            0
+//        }
+//    }?.also { position ->
+//        if (smooth) {
+//            fixSmoothScrollToPosition(position, post)
+//        } else {
+//            if (post) {
+//                post {
+//                    scrollToPosition(position)
+//                }
+//            } else {
+//                scrollToPosition(position)
+//            }
+//        }
+//    }
+}
+
+
+fun RecyclerView.forceStopRecyclerViewScroll() {
+    dispatchTouchEvent(
+        MotionEvent.obtain(
+            SystemClock.uptimeMillis(),
+            SystemClock.uptimeMillis(),
+            MotionEvent.ACTION_CANCEL,
+            0f,
+            0f,
             0
-        }
-    }?.also { position ->
-        if (smooth) {
-            fixSmoothScrollToPosition(position, post)
-        } else {
-            if (post) {
-                post {
-                    scrollToPosition(position)
-                }
-            } else {
-                scrollToPosition(position)
-            }
+        )
+    )
+}
+
+fun View.generatePaddingRect(
+    @Px start: Int = paddingStart,
+    @Px top: Int = paddingTop,
+    @Px end: Int = paddingEnd,
+    @Px bottom: Int = paddingBottom
+): Rect {
+    return Rect(start, top, end, bottom)
+}
+
+fun View.updatePaddingTag(
+    @Px start: Int = paddingStart,
+    @Px top: Int = paddingTop,
+    @Px end: Int = paddingEnd,
+    @Px bottom: Int = paddingBottom
+) {
+    setTag(PADDING_RECT_VIEW_TAG_KEY, generatePaddingRect(start, top, end, bottom))
+}
+
+fun View.getPaddingRectByTag(clear: Boolean = true): Rect? {
+    return (getTag(PADDING_RECT_VIEW_TAG_KEY) as? Rect).also {
+        if (clear) {
+            setTag(PADDING_RECT_VIEW_TAG_KEY, null)
         }
     }
 }
@@ -143,15 +187,15 @@ fun closeKeyboard(mEditText: View?, mContext: Activity) {
 }
 
 fun View.markTouchNotHideFlag() {
-    setTag(VIEW_TAG_KEY, true)
+    setTag(HOT_HIDE_VIEW_TAG_KEY, true)
 }
 
 fun View.clearTouchNotHideFlag() {
-    setTag(VIEW_TAG_KEY, null)
+    setTag(HOT_HIDE_VIEW_TAG_KEY, null)
 }
 
 fun View.hasTouchNotHideFlag(): Boolean {
-    val result = getTag(VIEW_TAG_KEY) == true
+    val result = getTag(HOT_HIDE_VIEW_TAG_KEY) == true
     if (!result && parent is ViewGroup) {
         return (parent as ViewGroup).hasTouchNotHideFlag()
     }
@@ -210,23 +254,4 @@ fun ViewGroup.getTouchTargetViews(
         result.add(this)
     }
     return result
-}
-
-@RequiresApi(Build.VERSION_CODES.LOLLIPOP)
-fun getSsharedElementReturnTransition(): TransitionSet {
-    return TransitionSet()
-        .addTransition(SubsamplingScaleImageViewSharedTransition().also {
-            it.setImageViewScaleType(1)
-            it.setSubsamplingScaleType(0)
-        })
-        .addTransition(ChangeBounds().also {
-            val arcMotion = ArcMotion()
-            arcMotion.maximumAngle = 90f
-            arcMotion.minimumVerticalAngle = 0f
-            arcMotion.minimumHorizontalAngle = 15f
-            it.pathMotion = arcMotion
-        })
-        .setInterpolator(LinearOutSlowInInterpolator())
-        .setOrdering(TransitionSet.ORDERING_TOGETHER)
-        .setDuration(350)
 }

@@ -1,13 +1,16 @@
 package com.example.myapplication.imkeyboard
 
 import android.app.Activity
+import android.content.Context
 import android.content.res.Configuration
-import android.graphics.Point
+import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.util.TypedValue
 import android.view.*
 import android.widget.PopupWindow
-import android.widget.Space
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.lifecycle.Lifecycle
@@ -15,6 +18,7 @@ import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.OnLifecycleEvent
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.android.synthetic.main.activity_keyboard3.*
 
 interface KeyboardStateObserver {
     fun onStateChanged(
@@ -174,12 +178,6 @@ class KeyboardHelper private constructor(private val host: Activity) :
         }
 
         recyclerView?.also {
-            it.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, oldBottom ->
-                if (oldBottom > bottom) {
-                    it.scrollToBottom()
-                }
-            }
-
             if (!layout.canAutoCollapse()) {
                 it.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
 
@@ -321,7 +319,7 @@ class KeyboardHelper private constructor(private val host: Activity) :
             // 隐藏键盘
             closeKeyboard(inputView, host)
         } else {
-            adjustInputViewPosition(switchPanelHeight, ACTION_NONE_TO_PANEL)
+            adjustInputViewPosition(ACTION_NONE_TO_PANEL)
         }
         return true
     }
@@ -350,7 +348,7 @@ class KeyboardHelper private constructor(private val host: Activity) :
             return false
         }
         switchPanelIsOpen = false
-        adjustInputViewPosition(0, ACTION_PANEL_TO_NONE)
+        adjustInputViewPosition(ACTION_PANEL_TO_NONE)
         return true
     }
 
@@ -457,12 +455,12 @@ class KeyboardHelper private constructor(private val host: Activity) :
             notifyKeyboardStateChanged(keyboardIsOpen(), switchPanelIsOpen, orientation)
             return
         }
-        val open = height > 130
+        val open = height > 0
         if (!open && switchPanelIsOpen) { // 键盘切换至表情面板
-            adjustInputViewPosition(switchPanelHeight, ACTION_KEYBOARD_TO_PANEL)
+            adjustInputViewPosition(ACTION_KEYBOARD_TO_PANEL)
             return
         }
-        val action = if (height > 130) {
+        val action = if (height > 0) {
             if (switchPanelIsOpen) {
                 ACTION_PANEL_TO_KEYBOARD
             } else {
@@ -472,7 +470,7 @@ class KeyboardHelper private constructor(private val host: Activity) :
             ACTION_KEYBOARD_TO_NONE
         }
         switchPanelIsOpen = false
-        adjustInputViewPosition(height, action)
+        adjustInputViewPosition(action)
     }
 
     private fun notifyKeyboardStateChanged(
@@ -515,7 +513,12 @@ class KeyboardHelper private constructor(private val host: Activity) :
      *
      * @param mode 1：表示收起面板  2: 表示显示面板  3:  键盘切换至面板 4 键盘操作
      */
-    private fun adjustInputViewPosition(height: Int, @KeyboardChangeAction action: Int) {
+    private fun adjustInputViewPosition(@KeyboardChangeAction action: Int) {
+        when (action) {
+            ACTION_NONE_TO_KEYBOARD, ACTION_NONE_TO_PANEL -> {
+                recyclerView?.scrollToBottom()
+            }
+        }
         if (!switchPanelIsOpen) {
             switchPanel.clearPanelShowViewIdFlag()
         }
@@ -524,7 +527,9 @@ class KeyboardHelper private constructor(private val host: Activity) :
             switchPanelIsOpen,
             host.resources.configuration.orientation
         )
-        keyboardLayout.startLayout(this, action)
+        Handler(Looper.getMainLooper()).postAtFrontOfQueue {
+            keyboardLayout.startLayout(this, action)
+        }
     }
 
     private class KeyboardChangeMonitor(
@@ -534,14 +539,18 @@ class KeyboardHelper private constructor(private val host: Activity) :
 
         var observer: ((Int, Int) -> Unit)? = null
 
-        private val popupView: View = Space(activity)
+        private val popupView: View = View(activity)
         private var lastKeyboardHeight = 0
         private var currentKeyboardHeight = 0
 
         private var originContentHeight = 0
-        private val screenSize = Point().also {
-            activity.windowManager.defaultDisplay.getRealSize(it)
-        }.y
+
+        private val parentVisibleHeight: Int
+            get() {
+                return Rect().also {
+                    parentView.getWindowVisibleDisplayFrame(it)
+                }.height()
+            }
 
         init {
             contentView = popupView
@@ -579,22 +588,19 @@ class KeyboardHelper private constructor(private val host: Activity) :
             if (contentHeight <= 0) {
                 return // 忽略无需处理
             }
-            val open = if (screenSize.minus(contentHeight) <= 300) {
+            val open = if (parentVisibleHeight.minus(contentHeight) <= activity.dip(100f)) {
                 originContentHeight = contentHeight
                 false
             } else {
                 true
             }
             if (open && originContentHeight <= 0) {
-                throw IllegalStateException("异常状态，无法计算键盘高度")
+                originContentHeight = parentVisibleHeight
             }
             val newHeight = if (open) {
                 originContentHeight.minus(contentHeight)
             } else {
                 0
-            }
-            if (open && newHeight <= 150) {
-                throw IllegalStateException("键盘高度计算错误")
             }
             if (currentKeyboardHeight == newHeight) {
                 return
@@ -603,7 +609,7 @@ class KeyboardHelper private constructor(private val host: Activity) :
             currentKeyboardHeight = newHeight
             val orientation = activity.resources.configuration.orientation
             when {
-                newHeight < 100 -> {
+                newHeight < 120 -> {
                     currentKeyboardHeight = 0
                     notifyKeyboardHeightChanged(0, orientation)
                 }
@@ -619,5 +625,14 @@ class KeyboardHelper private constructor(private val host: Activity) :
         private fun notifyKeyboardHeightChanged(height: Int, orientation: Int) {
             observer?.invoke(height, orientation)
         }
+
+        fun Context.dip(value: Float): Float {
+            return TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                value,
+                resources.displayMetrics
+            )
+        }
     }
+
 }

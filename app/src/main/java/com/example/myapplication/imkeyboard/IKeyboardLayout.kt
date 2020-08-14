@@ -136,6 +136,19 @@ var IKeyboardLayout.panelFixedHeight: Int
 
 interface IKeyboardLayout {
 
+    var contentView: View?
+
+    var panelView: View
+
+    var lastState: KeyboardPanelState
+
+    var curState: KeyboardPanelState
+
+    var keyboardHelper: KeyboardHelper?
+
+    fun canAutoCollapse() = false
+
+
     fun ViewGroup.assertView(block: ((type: Int, v: View) -> Unit)? = null) {
         val stateContentMask = 1
         val statePanelMask = 2
@@ -233,18 +246,6 @@ interface IKeyboardLayout {
             result
         }
     }
-
-    var contentView: View?
-
-    var panelView: View
-
-    var lastState: KeyboardPanelState
-
-    var curState: KeyboardPanelState
-
-    var keyboardHelper: KeyboardHelper?
-
-    fun canAutoCollapse() = false
 
     @CallSuper
     fun startLayout(provider: IKeyboardStateManger, @KeyboardChangeAction action: Int) {

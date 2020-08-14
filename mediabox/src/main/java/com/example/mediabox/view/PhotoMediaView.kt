@@ -9,11 +9,10 @@ import com.example.mediabox.ext.IMediaShowListener
 import com.github.chrisbanes.photoview.PhotoView
 
 class PhotoMediaView @JvmOverloads constructor(
-    context: Context? = null,
+    context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
-) : PhotoView(context, attrs, defStyleAttr),
-    IMediaShowListener {
+) : PhotoView(context, attrs, defStyleAttr), IMediaShowListener {
 
     override fun showMedia(uri: Uri) {
         setImageURI(uri)

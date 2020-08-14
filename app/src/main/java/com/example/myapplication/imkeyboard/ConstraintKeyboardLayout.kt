@@ -1,6 +1,7 @@
 package com.example.myapplication.imkeyboard
 
 import android.animation.TimeInterpolator
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.content.Context
 import android.content.res.Resources
@@ -13,12 +14,15 @@ import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
+import android.widget.LinearLayout
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
-import androidx.transition.AutoTransition
-import androidx.transition.TransitionManager
-import androidx.transition.TransitionSet
+import androidx.core.view.updatePadding
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.transition.*
 import com.example.myapplication.R
+import kotlinx.android.synthetic.main.activity_keyboard3.*
 
 /**
  * 我这个键盘表情切换，比@文哥的更平滑
@@ -61,6 +65,8 @@ open class ConstraintKeyboardLayout @JvmOverloads constructor(
     private var toggleStringIds = mutableListOf<String>()
 
     private var toggleIds = mutableListOf<Int>()
+
+    private var resizePadding = 0
 
     override var contentView: View? = null
 
@@ -158,7 +164,7 @@ open class ConstraintKeyboardLayout @JvmOverloads constructor(
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.action == MotionEvent.ACTION_DOWN) {
-            if (autoCollapse && keyboardHelper?.hasAnyPanelIsOpen() == true)  {
+            if (autoCollapse && keyboardHelper?.hasAnyPanelIsOpen() == true) {
                 if (takeIf {
                         autoReferenceId != View.NO_ID
                     }?.let {
@@ -204,6 +210,11 @@ open class ConstraintKeyboardLayout @JvmOverloads constructor(
             providerInputView()?.also {
                 autoReferenceId = it.id
             }
+        }
+        contentView?.also { view ->
+            layoutTransition.addTransition(PaddingTransition().also {
+                it.addTarget(view)
+            })
         }
     }
 
@@ -261,20 +272,20 @@ open class ConstraintKeyboardLayout @JvmOverloads constructor(
             ACTION_KEYBOARD_TO_NONE, ACTION_PANEL_TO_NONE -> {
                 duration = if (action == ACTION_KEYBOARD_TO_NONE) {
                     interpolator = DecelerateInterpolator(2.0f)
-                    120
+                    180
                 } else {
                     interpolator = DecelerateInterpolator(1.2f)
-                    200
+                    230
                 }
                 applyConstraintSet = collapseSet
             }
             ACTION_NONE_TO_PANEL, ACTION_KEYBOARD_TO_PANEL -> {
                 duration = if (action == ACTION_KEYBOARD_TO_PANEL) {
                     interpolator = LinearInterpolator()
-                    160
+                    210
                 } else {
                     interpolator = DecelerateInterpolator(1.2f)
-                    200
+                    230
                 }
                 applyConstraintSet = expandToPanelSet
             }
@@ -293,10 +304,10 @@ open class ConstraintKeyboardLayout @JvmOverloads constructor(
                 }
                 duration = if (action == ACTION_NONE_TO_KEYBOARD) {
                     interpolator = AccelerateDecelerateInterpolator()
-                    120
+                    180
                 } else {
                     interpolator = LinearInterpolator()
-                    160
+                    210
                 }
                 applyConstraintSet = expandToKeyboardSet
             }
@@ -319,10 +330,27 @@ open class ConstraintKeyboardLayout @JvmOverloads constructor(
                 KeyboardPanelState.KEYBOARD_PANEL_STATE_KEYBOARD, lastState, curState
             )
         ) {
-            layoutTransition.duration = 96
+            layoutTransition.duration = 125
             layoutTransition.interpolator = LinearInterpolator()
             TransitionManager.beginDelayedTransition(this, layoutTransition)
         }
+
+
+        contentView?.takeIf {
+            ((it as? RecyclerView)?.layoutManager as? LinearLayoutManager)?.itemCount ?: 0 < 10
+        }?.apply {
+            val topPadding = when (curState) {
+                KeyboardPanelState.KEYBOARD_PANEL_STATE_NONE -> 0
+                KeyboardPanelState.KEYBOARD_PANEL_STATE_KEYBOARD -> provider.getKeyBoardHeight()
+                KeyboardPanelState.KEYBOARD_PANEL_STATE_PANEL -> provider.getSwitchPanelHeight()
+            }.let {
+                paddingTop.minus(resizePadding).plus(it).apply {
+                    resizePadding = it
+                }
+            }
+            updatePadding(top = topPadding)
+        }
+
         constraintSet.applyToWithoutCustom(this)
     }
 

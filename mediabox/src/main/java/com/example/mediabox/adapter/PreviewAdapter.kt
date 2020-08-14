@@ -1,6 +1,7 @@
 package com.example.mediabox.adapter
 
 import android.graphics.Point
+import android.view.GestureDetector
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.example.mediabox.data.MediaData

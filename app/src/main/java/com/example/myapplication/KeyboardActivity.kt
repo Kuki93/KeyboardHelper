@@ -1,20 +1,19 @@
 package com.example.myapplication
 
 import android.os.Bundle
-import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatTextView
-import androidx.core.view.updatePadding
 import androidx.recyclerview.widget.RecyclerView
-import androidx.transition.TransitionManager
+import androidx.recyclerview.widget.SimpleItemAnimator
 import com.example.myapplication.imkeyboard.KeyboardHelper
 import com.example.myapplication.imkeyboard.SmoothPositionLinearLayoutManager
 import com.example.myapplication.imkeyboard.scrollToBottom
 import kotlinx.android.synthetic.main.activity_keyboard3.*
+import kotlin.concurrent.thread
+
 
 class KeyboardActivity : AppCompatActivity() {
 
@@ -27,6 +26,7 @@ class KeyboardActivity : AppCompatActivity() {
 
         class MyVH(item: View) : RecyclerView.ViewHolder(item)
 
+        var count = 30
         val adapter = object : RecyclerView.Adapter<MyVH>() {
             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyVH {
                 return MyVH(AppCompatTextView(this@KeyboardActivity).also {
@@ -36,7 +36,7 @@ class KeyboardActivity : AppCompatActivity() {
             }
 
             override fun getItemCount(): Int {
-                return 100
+                return count
             }
 
             override fun onBindViewHolder(holder: MyVH, position: Int) {
@@ -45,28 +45,36 @@ class KeyboardActivity : AppCompatActivity() {
                 }
             }
         }
-        toolbar.updatePadding()
+
+        adapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+            override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
+                super.onItemRangeInserted(positionStart, itemCount)
+//
+//                recycler_view.scrollToBottom()
+                recycler_view.post {
+                    recycler_view.smoothScrollToPosition(count - 1)
+                }
+            }
+        })
+
+        val l = SmoothPositionLinearLayoutManager(this)
         toolbar.setNavigationOnClickListener {
-            helper?.handlerToggleEvent(it)
+//            helper?.handlerToggleEvent(it)
+            recycler_view.scrollToBottom()
+            thread {
+                repeat(1) {
+                    runOnUiThread {
+                        count += 8
+                        adapter.notifyItemRangeInserted(count, 8)
+                    }
+                    Thread.sleep(50)
+                }
+            }
         }
-
-//        helper?.setLambdaPreHandleToggleClickListener { view, _, switchPanelVisible ->
-//            if (switchPanelVisible) {
-//                TransitionManager.beginDelayedTransition(root)
-//                if (view.id == btn_toggle.id) {
-//                    tv1.visibility = View.VISIBLE
-//                    tv2.visibility = View.GONE
-//                } else {
-//                    tv2.visibility = View.VISIBLE
-//                    tv1.visibility = View.GONE
-//                }
-//            }
-//            return@setLambdaPreHandleToggleClickListener false
-//        }
-
-        recycler_view.layoutManager = SmoothPositionLinearLayoutManager(this)
+        recycler_view.itemAnimator = NoAlphaItemAnimator()
+        recycler_view.setHasFixedSize(true)
+        recycler_view.layoutManager = l
         recycler_view.adapter = adapter
-
         recycler_view.scrollToBottom()
     }
 }

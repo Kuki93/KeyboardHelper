@@ -4,24 +4,31 @@ import android.content.Context
 import android.net.Uri
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
-import com.example.mediabox.paging.MediaListDataSource
+import com.example.mediabox.data.MediaConfig
 
-class MediaRepository(
+internal class MediaRepository(
     context: Context,
+    config: MediaConfig,
     mediaUri: Uri,
-    private var bucket: String?,
-    excludeGif: Boolean
+    private var bucket: String?
 ) {
 
+    private var initialLoadSize = 60
+
     val mediaData by lazy {
-        Pager(PagingConfig(pageSize = 50, initialLoadSize = 30)) {
+        Pager(PagingConfig(pageSize = 100, initialLoadSize = 60)) {
             MediaListDataSource(
                 context,
+                config,
                 mediaUri,
                 bucket,
-                excludeGif
+                initialLoadSize
             )
         }.flow
+    }
+
+    fun refresh(initSize: Int? = null) {
+        this.initialLoadSize = initSize ?: 60
     }
 
     fun refresh(bucket: String?) {

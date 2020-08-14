@@ -37,7 +37,7 @@ class SmoothPositionLinearLayoutManager : LinearLayoutManager {
         LinearSmoothScroller(context) {
 
         override fun calculateTimeForDeceleration(dx: Int): Int {
-            return 100
+            return 250
         }
 
         override fun getVerticalSnapPreference(): Int {

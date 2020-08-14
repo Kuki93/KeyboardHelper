@@ -1,7 +1,5 @@
 package com.example.mediabox.glide.gif;
 
-import com.example.mediabox.glide.gif.FrameSequenceDrawable;
-
 import androidx.annotation.NonNull;
 
 import com.bumptech.glide.load.resource.drawable.DrawableResource;
